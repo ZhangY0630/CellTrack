@@ -55,7 +55,7 @@ class Tracker(object):
         row_ind,col_ind = linear_sum_assignment(cost)
         for i in range(len(row_ind)):
             assignment[row_ind[i]] = col_ind[i]
-        
+
         #identify tracks with no assignment, if any
         un_assigned_tracks = []
         for i in range(len(assignment)):
@@ -67,12 +67,33 @@ class Tracker(object):
             else:
                 self.tracks[i].skipped_frame +=1
 
+        #update kalman filter
+
+        for i in range(len(assignment)):
+            self.tracks[i].KF.predict()
+
+            if (assignment[i] != -1):
+                #clear the cumulative skip frame
+                self.tracks[i].skipped_frame = 0
+                self.tracks[i].prediction = self.tracks[i].KF.correct(detections[assignment[i]],True)
+            else:
+                self.tracks[i].prediction = self.tracks[i].KF.correct(np.array([[0], [0]]),False)
+
+            # self.tracks[i].trace.append(self.tracks[i].prediction)
+            if assignment[i] == -1:
+                self.tracks[i].trace.append(self.tracks[i].trace[-1])
+            else:
+                self.tracks[i].trace.append(detections[assignment[i]])
+            self.tracks[i].KF.lastResult = self.tracks[i].prediction
+
+
+
         # if trackers are not detected for a long time, remove it
         del_tracks = []
         for track in self.tracks:
             if (track.skipped_frame > self.max_frames_to_skip):
                 del_tracks.append(track)
-
+# because here delete the list , whole structure move forward
         if len(del_tracks) > 0:
             for track in del_tracks:
                 if track.trackID < len(self.tracks):
@@ -94,24 +115,6 @@ class Tracker(object):
                 self.trackID +=1
                 self.tracks.append(track)
 
-        #update kalman filter
-
-        for i in range(len(assignment)):
-            self.tracks[i].KF.predict()
-
-            if (assignment[i] != -1):
-                #clear the cumulative skip frame
-                self.tracks[i].skipped_frame = 0
-                self.tracks[i].prediction = self.tracks[i].KF.correct(detections[assignment[i]],True)
-            else:
-                self.tracks[i].prediction = self.tracks[i].KF.correct(np.array([[0], [0]]),False)
-
-            # self.tracks[i].trace.append(self.tracks[i].prediction)
-            if assignment[i] == -1:
-                self.tracks[i].trace.append(self.tracks[i].trace[-1])
-            else:
-                self.tracks[i].trace.append(detections[assignment[i]])
-            self.tracks[i].KF.lastResult = self.tracks[i].prediction
 
 
         

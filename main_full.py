@@ -42,9 +42,11 @@ def main():
         img= plt.imread(imgN)
 
        
-        if second == 4:
+        if second == 5:
             break    
-             
+        if second ==4:
+            print("it's 4")
+
 
         graph = Graph(img,height,width)
         
