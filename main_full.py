@@ -42,7 +42,7 @@ def main():
         img= plt.imread(imgN)
 
        
-        if second == 5:
+        if second == 50:
             break    
         if second ==4:
             print("it's 4")

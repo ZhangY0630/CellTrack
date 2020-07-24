@@ -96,12 +96,12 @@ class Tracker(object):
 # because here delete the list , whole structure move forward
         if len(del_tracks) > 0:
             for track in del_tracks:
-                if track.trackID < len(self.tracks):
-                    self.tracks.remove(track)
-                    if(track.trackID in assignment):
+                # if track.trackID < len(self.tracks):
+                self.tracks.remove(track)
+                if(track.trackID in assignment):
                         assignment.remove(track.trackID)
-                else:
-                    print("ID is greater than the lenth")
+                # else:
+                #     print("ID is greater than the lenth")
         # lets check for the detections that dont belong to any track
         un_assigned_detection = []
         for i in range(len(detections)):
