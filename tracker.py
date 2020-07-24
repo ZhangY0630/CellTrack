@@ -107,7 +107,10 @@ class Tracker(object):
                 self.tracks[i].prediction = self.tracks[i].KF.correct(np.array([[0], [0]]),False)
 
             # self.tracks[i].trace.append(self.tracks[i].prediction)
-            self.tracks[i].trace.append(detections[assignment[i]])
+            if assignment[i] == -1:
+                self.tracks[i].trace.append(self.tracks[i].trace[-1])
+            else:
+                self.tracks[i].trace.append(detections[assignment[i]])
             self.tracks[i].KF.lastResult = self.tracks[i].prediction
 
 
