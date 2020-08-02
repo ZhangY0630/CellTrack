@@ -13,9 +13,10 @@ class Detector(object):
             l[1].append(cell.id)
             if debug:
                 plt.plot(cell.COM()[0],cell.COM()[1],marker = "o")
-                plt.draw
+                plt.draw()
         
         if debug:
+            plt.clf()
             plt.show()
         return l
 

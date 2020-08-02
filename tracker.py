@@ -10,6 +10,44 @@ class Track(object):
         self.prediction = np.array(prediction)
         self.skipped_frame = 0
         self.trace = []
+        self.frame = []
+        self.mitosisFrame = -1
+        self.end = -1
+        self.parent = None
+        self.recovery = False
+        
+    def printTrace(self, num):
+        print("It has travelled:",end=' ')
+        for i in range(num+1):
+            loc = self.trace[i]
+            x = loc[0]
+            y = loc[1]
+            print(f"({x},{y})", end="")
+            if i == num:
+                break
+            print("->",end="")
+        print("")
+
+    def findFrame(self,num):
+        for i in range(len(self.frame)):
+            if self.frame[i] == num:
+                return i
+        return -1
+
+
+
+
+    def totalDistance(self,num):
+        sum = 0
+        pre = np.array(self.trace[0])
+        for i in range(num+1):
+            loc = np.array(self.trace[i])
+            sum += np.linalg.norm(loc-pre)
+            pre = loc
+        return sum
+
+    def addFrame(self,i):
+        self.frame.append(i)
 
 class Tracker(object):
     def __init__(self, thresh,max_frames_to_skip, id):
@@ -19,11 +57,18 @@ class Tracker(object):
         self.trackID = id
         self.tracks = []
 
-    def Update(self,observation):
+    def findTrack(self,id):
+        for track in self.tracks:
+            if track.trackID==id:
+                return track
+        return None
+
+    def Update(self,observation,frame):
         detections = np.array(observation[0])
         if (len(self.tracks)==0):
             for detection in detections:
                 track = Track(detection,self.trackID)
+                track.addFrame(frame)
                 self.trackID += 1
                 self.tracks.append(track)
 
@@ -73,16 +118,20 @@ class Tracker(object):
             self.tracks[i].KF.predict()
 
             if (assignment[i] != -1):
+
                 #clear the cumulative skip frame
                 self.tracks[i].skipped_frame = 0
                 self.tracks[i].prediction = self.tracks[i].KF.correct(detections[assignment[i]],True)
             else:
                 self.tracks[i].prediction = self.tracks[i].KF.correct(np.array([[0], [0]]),False)
 
+
             # self.tracks[i].trace.append(self.tracks[i].prediction)
             if assignment[i] == -1:
                 self.tracks[i].trace.append(self.tracks[i].trace[-1])
             else:
+                if frame!=0:
+                    self.tracks[i].addFrame(frame)
                 self.tracks[i].trace.append(detections[assignment[i]])
             self.tracks[i].KF.lastResult = self.tracks[i].prediction
 
@@ -111,6 +160,7 @@ class Tracker(object):
         if (len(un_assigned_detection)!=0):
             for i in un_assigned_detection:
                 track = Track(detections[i],self.trackID)
+                track.addFrame(frame)
                 track.trace.append(detections[i])
                 self.trackID +=1
                 self.tracks.append(track)
