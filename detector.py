@@ -20,7 +20,7 @@ class Detector(object):
         return l
 
 if __name__ == "__main__":
-    img = plt.imread("mask_DIC/mask006.tif")
+    img = plt.imread("mask_DIC/mask008.tif")
     plt.imshow(img)
     plt.draw()
     size = img.shape

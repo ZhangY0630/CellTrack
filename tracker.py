@@ -100,8 +100,7 @@ class Tracker(object):
                 self.tracks.remove(track)
                 if(track.trackID in assignment):
                         assignment.remove(track.trackID)
-                # else:
-                #     print("ID is greater than the lenth")
+              
         # lets check for the detections that dont belong to any track
         un_assigned_detection = []
         for i in range(len(detections)):
@@ -111,9 +110,11 @@ class Tracker(object):
         #for this detection start new tracks
         if (len(un_assigned_detection)!=0):
             for i in un_assigned_detection:
-                track = Track(i,self.trackID)
+                track = Track(detections[i],self.trackID)
+                track.trace.append(detections[i])
                 self.trackID +=1
                 self.tracks.append(track)
+
 
 
 
