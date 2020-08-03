@@ -1,4 +1,4 @@
-import cv2
+import cv2 as cv
 import matplotlib.pyplot as plt
 from matplotlib.animation import Animation
 from matplotlib.animation import FuncAnimation
@@ -12,29 +12,36 @@ import numpy as np
 from tracker import Tracker ,Track
 from detector import Detector
 import argparse
-
+import matplotlib.patches as patches
 
 def config_parse():
     parser = argparse.ArgumentParser()
     parser.add_argument('--plot',default=False,action='store_true')
     parser.add_argument('--traj' ,default=False,action='store_true')
     parser.add_argument('--num',type=int,default=5)
+    parser.add_argument('--save',default=False,action='store_true')
+    parser.add_argument('--type',type=str,default="None")
+    parser.add_argument("--interval", type=int,default=200)
+    parser.add_argument("--search",default=False,action="store_true")
     args = parser.parse_args()
     return args
 
 
 
 
-def update(i,imgs,axs,Clist,tracker):
+def update(i,imgs,axs,Clist,tracker,graphs):
     axs.cla()
     label = f"Timestep {i}"
     axs.set_xlabel(label)
     img = imgs[i]
     axs.imshow(img)
     Cells = Clist[i][0]
+    graph = graphs[i]
+    num = graph.cell_size()
+    axs.text(300,500,f"Current Cell Num: {num}")
 
     for c in Cells:
-        plt.plot(c[0], c[1], marker="o")
+        axs.plot(c[0], c[1], marker="o")
         plt.draw()
 
     t = tracker[i]
@@ -49,6 +56,18 @@ def update(i,imgs,axs,Clist,tracker):
         if track.mitosisFrame !=-1:
             if i>=track.end:
                 continue
+            if track.mitosisFrame<=i:
+                try:
+                    cell = graph.get_cell(track.cellID).empty
+                except:
+                    continue
+                cell = cv.convertScaleAbs(cell)
+                contours, hierarchy = cv.findContours(cell, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+                x,y,w,h = cv.boundingRect(contours[0])
+
+                # Create a Rectangle patch
+                rect = patches.Rectangle((x, y), w, h, linewidth=1, edgecolor='r', facecolor='none')
+                axs.add_patch(rect)
         if(len(track.trace)>1):
             # for j in range(len(tracker.tracks[i].trace)-1):
 
@@ -67,16 +86,13 @@ def update(i,imgs,axs,Clist,tracker):
             axs.text(lastx, lasty, str(id))
             plt.draw()
 
-
-
-
-
     return axs
 
-def MitosisRecovery(tracker,plt_trace):
-    maxD = 50
-
+def MitosisRecovery(tracker,plt_trace,minD,maxD):
     for track in tracker.tracks:
+
+        if track.trackID==17:
+            print("25")
 
         if track.recovery:
             continue
@@ -96,7 +112,7 @@ def MitosisRecovery(tracker,plt_trace):
                 if loc_i !=-1:
                     loc = np.array(othertrack.trace[loc_i])
                     dist = np.linalg.norm(loc - startloc)
-                    if 10<dist<=maxD:
+                    if minD<dist<=maxD:
                         distlist.append(dist)
                         location.append(othertrack)
         if len(distlist) ==0:
@@ -108,16 +124,17 @@ def MitosisRecovery(tracker,plt_trace):
         for stage in plt_trace:
             for trace in stage:
                 if trace.trackID == ori.trackID:
-                    if max(trace.frame) >= startFrame:
+                    if max(trace.frame) >= previousFrame:
 
-                        trace.mitosisFrame = previousFrame-2
+                        trace.mitosisFrame = previousFrame-4
                         trace.end = startFrame
 
 
-        track1 = Track(ori.trace[startFrame],tracker.trackID)
+        track1 = Track(None,tracker.trackID,ori.cellID)
         tracker.trackID +=1
-        track1.trace = ori.trace[startFrame:]
-        track1.frame = ori.frame[startFrame:]
+        inx = ori.findFrame(previousFrame)
+        track1.trace = ori.trace[inx:]
+        track1.frame = ori.frame[inx:]
         track1.recovery = True
         tracker.tracks.append(track1)
         f = track1.frame[0]
@@ -137,7 +154,7 @@ def MitosisRecovery(tracker,plt_trace):
         print(f"{track.trackID}->{ori.trackID}")
 
 
-        return plt_trace
+    return plt_trace
 
 
 
@@ -146,21 +163,39 @@ def main():
     fig = plt.figure()
     args = config_parse()
     imgs = []
+    graphs = []
     if not (args.traj or args.plot):
         print("Please choose plot method")
         return
-
     if args.traj:
         ax = plt.axes(projection='3d')
     else:
         fig,axs = plt.subplots()
+    dataset = ['dic','fluo','phc']
+    if args.type in dataset:
+        if args.type == 'dic':
+            #this associate range when trace backward, used to detect mitosis
+            # the new trace needs to link old trace in previous frame
+            minD = 30
+            maxD = 70
+            #the dissassociateRange of kalman track
+            dissassociateRange = 30
+        if args.type == 'fluo':
+            raise NotImplementedError
+        if args.type == 'phc':
+            raise NotImplementedError
+    else:
+        print(f"Please choose from {dataset}")
+        return
+
+
     img = plt.imread("mask_DIC/mask000.tif")
 
     size = img.shape
     width = size[0]
     height  = size[1]
     #we cant delete
-    tracker = Tracker(30,100,0)
+    tracker = Tracker(dissassociateRange,100,0)
     detector = Detector()
 
 
@@ -189,14 +224,6 @@ def main():
         imgN = os.path.join("mask_DIC/" + name)
         print(imgN)
         img= plt.imread(imgN)
-    
-
-       
-
-        if second ==7:
-            print("it's 4")
-
-
         graph = Graph(img,height,width)
         
         centers = detector.Detect(graph)
@@ -204,6 +231,7 @@ def main():
         tracker.Update(centers,second)
 
         if args.traj:
+            #TODO repair traj hasn't been done
             for i in range(len(tracker.tracks)):
                 if(len(tracker.tracks[i].trace)>1):
                     # for j in range(len(tracker.tracks[i].trace)-1):
@@ -223,9 +251,8 @@ def main():
             oriN = os.path.join("Sequence 1/" + ori[second])
             originImg = plt.imread(oriN)
             imgs.append(originImg)
-            elements = []
             plt_trace.append(copy.deepcopy(tracker.tracks))
-
+            graphs.append(copy.deepcopy(graph))
 
                     
       
@@ -235,12 +262,15 @@ def main():
         if second == args.num:
             break
 
-    plt_trace = MitosisRecovery(tracker,plt_trace)
+    plt_trace = MitosisRecovery(tracker,plt_trace,minD,maxD)
 
     if args.plot:
-        ani = FuncAnimation(fig,update,fargs=(imgs,axs,Clist,plt_trace),interval=500,frames=second)
+        ani = FuncAnimation(fig,update,fargs=(imgs,axs,Clist,plt_trace,graphs),interval=args.interval,frames=second)
     plt.show()
-    done = False
+    if args.save:
+        ani.save('myAnimation.gif', writer='imagemagick', fps=15)
+
+    done = args.search
     while done:
         choice = input("> ")
         qlist= ['speed','total','net']
@@ -287,13 +317,6 @@ def main():
 
         if choice == "q":
             done=False
-
-
-                
-
-   
-
-
 
 
 if __name__ == "__main__":

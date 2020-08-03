@@ -4,7 +4,7 @@ from scipy.optimize import linear_sum_assignment
 
 class Track(object):
     
-    def __init__(self,prediction,trackID):
+    def __init__(self,prediction,trackID,cellID):
         self.trackID = trackID
         self.KF = KalmanFilter()
         self.prediction = np.array(prediction)
@@ -15,6 +15,7 @@ class Track(object):
         self.end = -1
         self.parent = None
         self.recovery = False
+        self.cellID = cellID
         
     def printTrace(self, num):
         print("It has travelled:",end=' ')
@@ -65,9 +66,12 @@ class Tracker(object):
 
     def Update(self,observation,frame):
         detections = np.array(observation[0])
+        ids = np.array(observation[1])
         if (len(self.tracks)==0):
-            for detection in detections:
-                track = Track(detection,self.trackID)
+            for i in range(len( detections)):
+                detection = detections[i]
+                id = ids[i]
+                track = Track(detection,self.trackID,id)
                 track.addFrame(frame)
                 self.trackID += 1
                 self.tracks.append(track)
@@ -159,7 +163,7 @@ class Tracker(object):
         #for this detection start new tracks
         if (len(un_assigned_detection)!=0):
             for i in un_assigned_detection:
-                track = Track(detections[i],self.trackID)
+                track = Track(detections[i],self.trackID,ids[i])
                 track.addFrame(frame)
                 track.trace.append(detections[i])
                 self.trackID +=1
